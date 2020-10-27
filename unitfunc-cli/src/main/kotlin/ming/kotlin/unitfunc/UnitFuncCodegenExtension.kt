@@ -45,7 +45,6 @@ import org.jetbrains.kotlin.types.typeUtil.isLong
 import org.jetbrains.kotlin.types.typeUtil.isUnit
 import org.jetbrains.kotlin.util.OperatorNameConventions
 import org.jetbrains.org.objectweb.asm.Handle
-import org.jetbrains.org.objectweb.asm.MethodVisitor
 import org.jetbrains.org.objectweb.asm.Opcodes.ACC_FINAL
 import org.jetbrains.org.objectweb.asm.Opcodes.ACC_PRIVATE
 import org.jetbrains.org.objectweb.asm.Opcodes.ACC_STATIC
@@ -54,7 +53,6 @@ import org.jetbrains.org.objectweb.asm.Opcodes.H_INVOKESTATIC
 import org.jetbrains.org.objectweb.asm.Type
 import org.jetbrains.org.objectweb.asm.commons.Method
 import java.lang.invoke.LambdaMetafactory
-import java.util.concurrent.ConcurrentHashMap
 import java.util.function.BiConsumer
 import java.util.function.Consumer
 import java.util.function.DoubleConsumer
@@ -96,8 +94,6 @@ class UnitFuncCodegenExtension(private val messageCollector: MessageCollector) :
         }
     }
 
-    private val syntheticGenerated = ConcurrentHashMap<String, Boolean>()
-
     override fun interceptClassBuilderFactory(interceptedFactory: ClassBuilderFactory, bindingContext: BindingContext, diagnostics: DiagnosticSink) =
         object : ClassBuilderFactory by interceptedFactory {
             override fun newClassBuilder(origin: JvmDeclarationOrigin) =
@@ -106,35 +102,23 @@ class UnitFuncCodegenExtension(private val messageCollector: MessageCollector) :
                     private val delegate = interceptedFactory.newClassBuilder(origin)
                     override fun getDelegate() = delegate
 
-                    override fun newMethod(origin: JvmDeclarationOrigin, access: Int, name: String, desc: String, signature: String?, exceptions: Array<out String>?): MethodVisitor {
-
-                        val function = origin.descriptor as? FunctionDescriptor
-                            ?: return super.newMethod(origin, access, name, desc, signature, exceptions)
-
-                        // is top-level member (TODO: should handle top-level functions)
-                        if (function.containingDeclaration !is ClassDescriptor) {
-                            return super.newMethod(origin, access, name, desc, signature, exceptions)
-                        }
-
-                        // already in the generateClassSyntheticParts phase
-                        if (syntheticGenerated.getOrDefault(delegate.thisName, false)) {
-                            return super.newMethod(origin, access, name, desc, signature, exceptions)
-                        }
-
-                        // non-unit return function or non-general function
-                        if (!function.hasValidUnitFunctionParameter() || !function.isGeneralFunction()) {
-                            return super.newMethod(origin, access, name, desc, signature, exceptions)
-                        }
-
-                        // mark origin method synthetic
-                        return super.newMethod(origin, access or ACC_SYNTHETIC, name, desc, signature, exceptions)
-                    }
+                    override fun newMethod(origin: JvmDeclarationOrigin, access: Int, name: String, desc: String, signature: String?, exceptions: Array<out String>?) =
+                        origin.descriptor
+                            // is function
+                            .let { it as? FunctionDescriptor }
+                            // is class member (TODO: should handle top-level functions)
+                            ?.takeIf { it.containingDeclaration is ClassDescriptor }
+                            // match the pre-condition for generating
+                            ?.takeIf { it.hasValidUnitFunctionParameter() && it.isGeneralFunction() }
+                            ?.let {
+                                messageCollector.report(WARNING, "marking ${render(it)} synthetic")
+                                super.newMethod(origin, access or ACC_SYNTHETIC, name, desc, signature, exceptions)
+                            }
+                            ?: super.newMethod(origin, access, name, desc, signature, exceptions)
                 }
         }
 
     override fun generateClassSyntheticParts(codegen: ImplementationBodyCodegen) {
-
-        syntheticGenerated[codegen.v.thisName] = true
 
         // all functions which contain `(...) -> Unit` parameter
         val allMatchedFunctions = with(codegen.descriptor.unsubstitutedMemberScope) {

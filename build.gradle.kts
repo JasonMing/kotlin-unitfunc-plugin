@@ -25,14 +25,5 @@ subprojects {
         plugins.withId("java") {
             "compileOnly"("com.google.auto.service:auto-service:1.0-rc7")
         }
-        // plugins.withId("org.jetbrains.kotlin.jvm") {
-        //     "implementation"(kotlin("stdlib"))
-        //     "implementation"(kotlin("stdlib-jdk8"))
-        // }
-        // plugins.withId("org.jetbrains.kotlin.kapt") {
-        //     afterEvaluate {
-        //         "kapt"("com.google.auto.service:auto-service:1.0-rc7")
-        //     }
-        // }
     }
 }

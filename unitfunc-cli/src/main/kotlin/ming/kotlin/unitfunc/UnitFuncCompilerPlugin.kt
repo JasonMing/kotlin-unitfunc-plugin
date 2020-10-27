@@ -38,8 +38,6 @@ class UnitFuncComponentRegistrar : ComponentRegistrar {
 
     override fun registerProjectComponents(project: MockProject, configuration: CompilerConfiguration) {
 
-        // StorageComponentContainerContributor.registerExtension(project, CliUnitFuncComponentContainerContributor(/*annotations*/))
-
         val messageCollector = configuration.getNotNull(MESSAGE_COLLECTOR_KEY)
 
         val extension = UnitFuncCodegenExtension(messageCollector)
@@ -47,16 +45,3 @@ class UnitFuncComponentRegistrar : ComponentRegistrar {
         ExpressionCodegenExtension.registerExtension(project, extension)
     }
 }
-
-// class CliUnitFuncComponentContainerContributor(
-// ) : StorageComponentContainerContributor {
-//     override fun registerModuleComponents(container: StorageComponentContainer, platform: TargetPlatform, moduleDescriptor: ModuleDescriptor) {
-//
-//         if (!platform.isJvm()) {
-//             return
-//         }
-//
-//         // TODO: don't known usage
-//         // container.useInstance(CliNoArgDeclarationChecker(annotations))
-//     }
-// }
